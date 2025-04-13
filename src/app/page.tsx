@@ -39,9 +39,20 @@ export default function Home() {
     recognition.start();
   };
 
+  // Add new state for interruption
+  const [isInterrupting, setIsInterrupting] = useState(false);
+
+  // Add stop function
+  const stopConversation = () => {
+    setIsInterrupting(true);
+    window.speechSynthesis.cancel();
+    setIsLoading(false);
+  };
+
   const handleConversation = async (inputText: string) => {
     try {
       setIsLoading(true);
+      setIsInterrupting(false);
       setConversation(prev => [...prev, { type: 'user', text: inputText }]);
       
       let accumulatedText = '';
@@ -63,6 +74,9 @@ export default function Home() {
       setConversation(prev => [...prev, { type: 'ai', text: '' }]);
 
       for (let i = 0; i < words.length; i++) {
+        if (isInterrupting) {
+          break;
+        }
         currentResponse += words[i] + ' ';
         accumulatedText += words[i] + ' ';
         
@@ -86,6 +100,7 @@ export default function Home() {
       console.error('Erreur:', error);
     } finally {
       setIsLoading(false);
+      setIsInterrupting(false);
     }
   };
 
@@ -135,6 +150,16 @@ export default function Home() {
                 <Mic className="h-12 w-12" />
               )}
             </Button>
+
+            {isLoading && (
+              <Button
+                onClick={stopConversation}
+                variant="destructive"
+                className="absolute bottom-8 animate-pulse"
+              >
+                Arrêter la réponse
+              </Button>
+            )}
           </div>
 
           {isLoading && (
