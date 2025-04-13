@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Mic, MicOff } from "lucide-react";
 
 export default function Home() {
   const [text, setText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [conversation, setConversation] = useState<Array<{type: 'user' | 'ai', text: string}>>([]);
 
   const startListening = () => {
     const recognition = new (window as any).webkitSpeechRecognition();
@@ -38,8 +42,12 @@ export default function Home() {
   const handleConversation = async (inputText: string) => {
     try {
       setIsLoading(true);
+      setConversation(prev => [...prev, { type: 'user', text: inputText }]);
       
-      // Envoyer le texte à l'API
+      let accumulatedText = '';
+      let currentResponse = '';
+      const synth = window.speechSynthesis;
+
       const response = await fetch('/api/tts', {
         method: 'POST',
         headers: {
@@ -49,12 +57,30 @@ export default function Home() {
       });
 
       const data = await response.json();
+      const words = data.response.split(' ');
       
-      // Synthèse vocale de la réponse
-      const synth = window.speechSynthesis;
-      const utterance = new SpeechSynthesisUtterance(data.response);
-      utterance.lang = 'fr-FR';
-      synth.speak(utterance);
+      // Ajouter une réponse vide initiale
+      setConversation(prev => [...prev, { type: 'ai', text: '' }]);
+
+      for (let i = 0; i < words.length; i++) {
+        currentResponse += words[i] + ' ';
+        accumulatedText += words[i] + ' ';
+        
+        // Mettre à jour le message dans la conversation
+        setConversation(prev => {
+          const newConv = [...prev];
+          newConv[newConv.length - 1].text = currentResponse;
+          return newConv;
+        });
+
+        // Parler tous les 10 mots
+        if (accumulatedText.split(' ').length >= 10 || i === words.length - 1) {
+          const utterance = new SpeechSynthesisUtterance(accumulatedText);
+          utterance.lang = 'fr-FR';
+          synth.speak(utterance);
+          accumulatedText = ''; // Réinitialiser pour le prochain groupe de mots
+        }
+      }
 
     } catch (error) {
       console.error('Erreur:', error);
@@ -64,38 +90,61 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Assistant Vocal IA</h1>
-        
-        <div className="space-y-4">
-          <textarea
-            className="w-full p-4 border rounded-lg"
-            rows={5}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Votre message apparaîtra ici..."
-            readOnly
-          />
-          
-          <div className="flex items-center gap-4">
-            <button
-              onClick={startListening}
-              disabled={isListening || isLoading}
-              className="bg-blue-500 text-white px-6 py-2 rounded-lg disabled:opacity-50"
-            >
-              {isListening ? 'Écoute en cours...' : 'Commencer à parler'}
-            </button>
-            
-            {isLoading && (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                <span className="ml-2 text-blue-500">Traitement en cours...</span>
+    <main className="min-h-screen p-4 bg-gradient-to-b from-slate-900 to-slate-800">
+      <Card className="max-w-2xl mx-auto bg-white/10 backdrop-blur-lg border-none">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold text-center text-white">
+            Assistant Vocal IA
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="h-[400px] overflow-y-auto rounded-lg bg-black/20 p-4 space-y-4">
+            {conversation.map((msg, index) => (
+              <div
+                key={index}
+                className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg p-3 ${
+                    msg.type === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-white'
+                  }`}
+                >
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {isListening && (
+              <div className="flex justify-center">
+                <div className="animate-pulse text-blue-400">Écoute en cours...</div>
               </div>
             )}
           </div>
-        </div>
-      </div>
+
+          <div className="flex justify-center gap-4">
+            <Button
+              onClick={startListening}
+              disabled={isListening || isLoading}
+              className="w-40 h-40 rounded-full transition-all hover:scale-105"
+              variant={isListening ? "destructive" : "default"}
+            >
+              {isListening ? (
+                <MicOff className="h-12 w-12" />
+              ) : (
+                <Mic className="h-12 w-12" />
+              )}
+            </Button>
+          </div>
+
+          {isLoading && (
+            <div className="flex justify-center items-center gap-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <span className="text-blue-500">Traitement en cours...</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 }
