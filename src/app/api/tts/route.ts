@@ -10,7 +10,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'codellama',
+        model: 'gemma3:1b',
         prompt: text,
         stream: false,
         // Ajout des paramètres d'optimisation
